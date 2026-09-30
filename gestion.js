@@ -331,7 +331,8 @@ async function entrar(s){
   if(error || esAdmin!==true){
     document.getElementById("pestanas").innerHTML = "";
     document.getElementById("contenido").innerHTML = `<div class="card"><h2>Esta cuenta no es administradora</h2>
-      <p class="meta">${error ? "Falta ejecutar schema_gestion.sql en Supabase." : "Añádela a la tabla admins en Supabase (como al final de schema_gestion.sql)."}</p></div>`;
+      <p class="meta">${error ? `Supabase no encuentra las funciones de gestión. Comprueba que has ejecutado schema_gestion.sql en el proyecto ${esc(SUPABASE_URL.replace("https://","").split(".")[0])}.` : "Añádela a la tabla admins en Supabase (como al final de schema_gestion.sql)."}</p>
+      ${error ? `<p class="meta">Error de Supabase: ${esc([error.code, error.message].filter(Boolean).join(" · "))}</p>` : ""}</div>`;
     return;
   }
   render();

@@ -209,3 +209,6 @@ grant execute on function public.admin_clientes(), public.admin_set_suscripcion(
 insert into public.admins (user_id, email)
 select id, email from auth.users where lower(email) = 'paularamisb@gmail.com'
 on conflict (user_id) do nothing;
+
+-- Que la API de Supabase vea ya las funciones y tablas nuevas.
+notify pgrst, 'reload schema';
