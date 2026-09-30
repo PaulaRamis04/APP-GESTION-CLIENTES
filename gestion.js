@@ -151,6 +151,11 @@ function pintarFicha(c){
       ${c.email ? `<a class="btn linea" href="mailto:${esc(c.email)}">Escribir email</a>` : ""}
     </div>
   </div>
+  ${c.user_id!==session?.user?.id ? `<div class="card">
+    <h2>Eliminar cuenta</h2>
+    <p class="meta">Borra la cuenta y todos sus datos (movimientos, plan, mensajes…). No se puede deshacer.</p>
+    <div class="fila-btns"><button class="btn peligro" data-borrar-cliente="${esc(c.user_id)}">Eliminar cuenta</button></div>
+  </div>` : ""}
   <div class="card">
     <h2>Historial del plan</h2>
     ${!h ? `<p class="meta">Cargando…</p>` : h.length ? `<ul class="historial">${h.map(x=>`<li>${fechaHora(x.hecho_en)}: ${esc(PLANES[x.plan]||x.plan)}${x.hasta?` hasta ${fecha(x.hasta)}`:""}${x.importe!=null?` · ${esc(x.importe)} €/mes`:""}${x.nota?` · ${esc(x.nota)}`:""}</li>`).join("")}</ul>` : `<p class="meta">Sin cambios todavía.</p>`}
@@ -253,6 +258,18 @@ async function activarPlan(id, plan, importe){
   delete historial[id];
   await recargarYPintar();
 }
+async function borrarCliente(id){
+  const c = clientePorId(id);
+  const email = c?.email || "";
+  const escrito = prompt(`Vas a borrar la cuenta de ${nombreDe(c)} y todos sus datos. No se puede deshacer.\n\nPara confirmarlo, escribe su email:`);
+  if(escrito===null) return;
+  if(escrito.trim().toLowerCase()!==email.toLowerCase()){ mostrarError("El email no coincide; no se ha borrado nada."); return; }
+  const {error} = await sb.rpc("admin_borrar_cliente", {p_user:id});
+  if(error) throw new Error(/PGRST202|schema cache/i.test(error.code+error.message) ? "Falta volver a ejecutar schema_gestion.sql en Supabase." : "No se pudo borrar la cuenta: "+error.message);
+  clienteSel = null; if(chatSel===id) chatSel = null; delete historial[id];
+  mostrarError("");
+  await recargarYPintar();
+}
 async function enviarChat(id){
   const caja = "chat-"+id, texto = (document.getElementById(caja)?.value || "").trim();
   if(!texto){ mostrarError("Escribe un mensaje antes de enviarlo."); return; }
@@ -302,6 +319,7 @@ function wire(){
     else if(d.enviarChat) conCarga(t, ()=>enviarChat(d.enviarChat));
     else if(d.responder) conCarga(t, ()=>responder(d.responder));
     else if(d.estado) conCarga(t, ()=>cambiarEstado(d.estado, d.valor));
+    else if(d.borrarCliente) conCarga(t, ()=>borrarCliente(d.borrarCliente));
     else if(d.activar) conCarga(t, ()=>activarPlan(d.activar, d.plan, d.importe));
   });
   document.getElementById("btnRecargar").onclick = e=>conCarga(e.currentTarget, recargarYPintar);

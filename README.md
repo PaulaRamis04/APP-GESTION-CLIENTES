@@ -3,7 +3,7 @@
 Panel para gestionar a los clientes de la app de finanzas ([Finanzas-app](https://github.com/PaulaRamis04/Finanzas-app)). Usa el mismo Supabase, así que los cambios se ven al momento en la app.
 
 - **Resumen**: clientes, premium, asesorías sin leer y mensajes del buzón por resolver.
-- **Clientes**: buscar, dar o quitar Premium o Premium + asesoría (con fecha de fin, aportación y nota) e historial de cambios.
+- **Clientes**: buscar, dar o quitar Premium o Premium + asesoría (con fecha de fin, aportación y nota), historial de cambios y eliminar una cuenta con todos sus datos (pide escribir su email para confirmar).
 - **Mini asesoría**: chat con cada cliente que tiene el plan de asesoría.
 - **Buzón**: ideas, fallos y supporters de la pestaña Comunidad; se responden desde aquí y a un supporter se le activa el plan con un botón.
 
