@@ -1,9 +1,7 @@
 -- App de gestión de clientes: administradoras, suscripciones, respuestas al buzón y mini asesoría.
 -- Ejecútalo en Supabase (SQL Editor) después de schema_premium.sql y schema_comunidad.sql.
 -- Se puede ejecutar más de una vez sin romper nada.
---
--- Al terminar, date de alta como administradora con el email con el que entras en la app:
---   insert into public.admins (user_id, email) select id, email from auth.users where email = 'TU_EMAIL' on conflict do nothing;
+-- Al final da de alta como administradora a paularamisb@gmail.com (tiene que tener ya cuenta en la app).
 
 -- ── Administradoras ──
 create table if not exists public.admins (
@@ -197,3 +195,8 @@ end $$;
 revoke execute on function public.admin_clientes(), public.admin_set_suscripcion(uuid, text, date, numeric, text), public.admin_buzon(), public._perfiles_clave() from public, anon;
 grant execute on function public.admin_clientes(), public.admin_set_suscripcion(uuid, text, date, numeric, text), public.admin_buzon(),
   public.es_admin(), public.es_premium(), public.tiene_asesoria(), public.tiene_suscripcion(text), public.marcar_asesoria_leida() to authenticated;
+
+-- ── Administradora ──
+insert into public.admins (user_id, email)
+select id, email from auth.users where lower(email) = 'paularamisb@gmail.com'
+on conflict (user_id) do nothing;
