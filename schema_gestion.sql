@@ -201,8 +201,52 @@ begin
     from public.comunidad c left join auth.users u on u.id = c.user_id;
 end $$;
 
-revoke execute on function public.admin_clientes(), public.admin_set_suscripcion(uuid, text, date, numeric, text), public.admin_buzon(), public._perfiles_clave() from public, anon;
-grant execute on function public.admin_clientes(), public.admin_set_suscripcion(uuid, text, date, numeric, text), public.admin_buzon(),
+-- ── Borrar cuentas ──
+-- Supabase no deja borrar un usuario ("Database error deleting user") si alguna tabla lo apunta
+-- sin "on delete". Aquí se arreglan esas referencias: user_id y columnas obligatorias borran las
+-- filas del usuario; las demás (p. ej. "hecho por") se quedan vacías.
+do $$
+declare r record;
+begin
+  for r in
+    select c.conname, c.conrelid::regclass as tabla, a.attname as columna, a.attnotnull as obligatoria
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+    where c.contype = 'f' and c.confrelid = 'auth.users'::regclass
+      and c.connamespace = 'public'::regnamespace
+      and array_length(c.conkey, 1) = 1
+      and c.confdeltype not in ('c', 'n')
+  loop
+    execute format('alter table %s drop constraint %I, add constraint %I foreign key (%I) references auth.users(id) on delete %s',
+      r.tabla, r.conname, r.conname, r.columna,
+      case when r.obligatoria or r.columna = 'user_id' then 'cascade' else 'set null' end);
+  end loop;
+end $$;
+
+-- Borra la cuenta y sus datos (también de tablas con user_id sin referencia a auth.users).
+create or replace function public.admin_borrar_cliente(p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare t record; clave text := public._perfiles_clave();
+begin
+  if not public.es_admin() then raise exception 'Solo para administradoras' using errcode = '42501'; end if;
+  if p_user = auth.uid() then raise exception 'No puedes borrar tu propia cuenta desde aquí'; end if;
+  if exists (select 1 from public.admins where user_id = p_user) then
+    raise exception 'Es administradora: quítala antes de la tabla admins';
+  end if;
+  for t in
+    select k.table_name from information_schema.columns k
+    join information_schema.tables x on x.table_schema = k.table_schema and x.table_name = k.table_name and x.table_type = 'BASE TABLE'
+    where k.table_schema = 'public' and k.column_name = 'user_id' and k.data_type = 'uuid'
+  loop
+    execute format('delete from public.%I where user_id = $1', t.table_name) using p_user;
+  end loop;
+  if clave = 'id' then delete from public.perfiles where id = p_user; end if;
+  delete from auth.users where id = p_user;
+  if not found then raise exception 'Esa cuenta ya no existe'; end if;
+end $$;
+
+revoke execute on function public.admin_clientes(), public.admin_set_suscripcion(uuid, text, date, numeric, text), public.admin_buzon(), public._perfiles_clave(), public.admin_borrar_cliente(uuid) from public, anon;
+grant execute on function public.admin_clientes(), public.admin_set_suscripcion(uuid, text, date, numeric, text), public.admin_buzon(), public.admin_borrar_cliente(uuid),
   public.es_admin(), public.es_premium(), public.tiene_asesoria(), public.tiene_suscripcion(text), public.marcar_asesoria_leida() to authenticated;
 
 -- ── Administradora ──
