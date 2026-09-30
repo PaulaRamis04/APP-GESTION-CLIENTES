@@ -9,7 +9,7 @@ Panel para gestionar a los clientes de la app de finanzas ([Finanzas-app](https:
 
 ## Puesta en marcha
 
-1. En Supabase, abre el SQL Editor y ejecuta `schema_gestion.sql` (después de `schema_premium.sql` y `schema_comunidad.sql`). Se puede ejecutar más de una vez.
+1. En Supabase, abre el SQL Editor y ejecuta `schema_gestion.sql` (si aún no tienes la tabla `comunidad` del buzón, la crea). Se puede ejecutar más de una vez.
 2. Al final de ese SQL quedas dada de alta como administradora con `paularamisb@gmail.com` (esa cuenta tiene que existir ya en la app). Para añadir a otra persona, repite el `insert into public.admins …` del final con su email.
 3. Abre `index.html` (o publícalo, por ejemplo con GitHub Pages) y entra con tu cuenta de la app de finanzas. Una cuenta que no esté en `admins` no ve ningún dato: lo impide Supabase, no solo la pantalla.
 

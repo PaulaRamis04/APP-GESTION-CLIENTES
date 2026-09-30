@@ -1,5 +1,5 @@
 -- App de gestión de clientes: administradoras, suscripciones, respuestas al buzón y mini asesoría.
--- Ejecútalo en Supabase (SQL Editor) después de schema_premium.sql y schema_comunidad.sql.
+-- Ejecútalo en Supabase (SQL Editor). Si aún no tienes la tabla comunidad (schema_comunidad.sql), la crea.
 -- Se puede ejecutar más de una vez sin romper nada.
 -- Al final da de alta como administradora a paularamisb@gmail.com (tiene que tener ya cuenta en la app).
 
@@ -87,7 +87,14 @@ language sql stable security definer set search_path = public as $$
   order by k.column_name = 'user_id' desc limit 1;
 $$;
 
--- ── Buzón de la comunidad: estado y respuesta ──
+-- ── Buzón de la comunidad (pestaña Comunidad de la app): estado y respuesta ──
+create table if not exists public.comunidad (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null check (tipo in ('supporter','idea','fallo')),
+  texto text not null default '',
+  importe numeric(10,2),
+  info jsonb
+);
 alter table public.comunidad add column if not exists user_id uuid default auth.uid() references auth.users on delete cascade;
 alter table public.comunidad add column if not exists estado text not null default 'nuevo';
 alter table public.comunidad add column if not exists respuesta text;
@@ -99,6 +106,8 @@ begin
   end if;
 end $$;
 alter table public.comunidad enable row level security;
+drop policy if exists comunidad_propios_enviar on public.comunidad;
+create policy comunidad_propios_enviar on public.comunidad for insert with check (user_id = auth.uid());
 drop policy if exists comunidad_propios_leer on public.comunidad;
 create policy comunidad_propios_leer on public.comunidad for select using (user_id = auth.uid());
 drop policy if exists comunidad_admin on public.comunidad;
