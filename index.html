@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Gestión</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%B8%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+<style>
+:root{
+  --ink:#4a3b3b; --paper:#fdf7f2; --line:#f0e4dc;
+  --accent:#f07f76; --accent-2:#e66b62; --accent-soft:#fde6e3;
+  --mint:#3fae92; --mint-soft:#e1f4ed; --lav:#8b7fd6; --lav-soft:#ece8fb; --peach:#c9803a; --peach-soft:#fdebd8;
+  --neg:#e0556a; --muted:#9a8a86; --card:#ffffff; --on-accent:#fff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#f5ecea; --paper:#1c1718; --line:#3a3132;
+    --accent:#f59a92; --accent-2:#f8aea7; --accent-soft:#3d2826;
+    --mint:#7fd6bb; --mint-soft:#1f3530; --lav:#b3a9f0; --lav-soft:#2b2740; --peach:#f2b77a; --peach-soft:#3a2d20;
+    --neg:#ff8a9a; --muted:#b3a4a1; --card:#262021; --on-accent:#2b1917;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:Nunito, system-ui, sans-serif; font-size:15px}
+h1{font-size:20px; margin:0} h2{font-size:16px; margin:0 0 10px}
+button{font-family:inherit}
+.meta{color:var(--muted); font-size:13px}
+.card{background:var(--card); border:1px solid var(--line); border-radius:22px; padding:18px; margin-bottom:16px; box-shadow:0 2px 10px rgba(20,20,30,.04)}
+label{font-size:12px; color:var(--muted); display:block; margin-bottom:4px; font-weight:600}
+input,select,textarea{width:100%; padding:11px 13px; border:1.5px solid var(--line); border-radius:14px; background:var(--paper); color:var(--ink); font-size:15px; font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none; border-color:var(--mint); background:var(--card)}
+textarea{resize:vertical}
+.btn{background:var(--accent); color:var(--on-accent); border:none; padding:11px 18px; border-radius:999px; font-size:14px; font-weight:700; cursor:pointer}
+.btn:hover{background:var(--accent-2)} .btn:disabled{opacity:.6; cursor:default}
+.btn.suave{background:var(--accent-soft); color:var(--accent)}
+.btn.linea{background:transparent; color:var(--ink); border:1.5px solid var(--line)}
+.btn.peq{padding:7px 13px; font-size:12.5px}
+.fila-btns{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.marca{display:inline-block; font-size:11px; font-weight:800; padding:2px 9px; border-radius:999px; white-space:nowrap}
+.m-gratis{background:var(--line); color:var(--muted)} .m-premium{background:var(--peach-soft); color:var(--peach)}
+.m-asesoria{background:var(--lav-soft); color:var(--lav)} .m-vencido{background:var(--accent-soft); color:var(--neg)}
+.m-idea{background:var(--mint-soft); color:var(--mint)} .m-fallo{background:var(--accent-soft); color:var(--neg)} .m-supporter{background:var(--peach-soft); color:var(--peach)}
+.m-nuevo{background:var(--accent); color:var(--on-accent)} .m-en_curso{background:var(--lav-soft); color:var(--lav)} .m-resuelto{background:var(--mint-soft); color:var(--mint)}
+.punto{display:inline-flex; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:var(--accent); color:var(--on-accent); font-size:11px; font-weight:800; align-items:center; justify-content:center}
+
+/* Acceso */
+.acceso{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px}
+.acceso .card{width:100%; max-width:380px}
+.acceso form{display:grid; gap:12px}
+#accesoMsg{min-height:18px; font-size:13px; color:var(--neg)}
+
+/* Estructura */
+.cabecera{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--card); position:sticky; top:0; z-index:5}
+.pestanas{display:flex; gap:6px; overflow-x:auto; padding:12px 16px 0}
+.pestana{border:none; background:transparent; color:var(--muted); padding:9px 14px; border-radius:999px; font-weight:800; font-size:14px; cursor:pointer; white-space:nowrap; display:flex; gap:6px; align-items:center}
+.pestana.activa{background:var(--accent-soft); color:var(--accent)}
+main{max-width:1100px; margin:0 auto; padding:16px}
+#err{display:none; background:var(--accent-soft); color:var(--neg); border-radius:14px; padding:10px 14px; margin-bottom:14px; font-weight:600}
+#err.ver{display:block}
+
+.cifras{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px}
+.cifra{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:14px; cursor:pointer; text-align:left; color:inherit}
+.cifra strong{display:block; font-size:26px} .cifra span{font-size:13px; color:var(--muted)}
+
+.filtros{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 14px}
+.chip{border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; cursor:pointer}
+.chip.sel{border-color:var(--accent); background:var(--accent-soft); color:var(--accent)}
+.lista{display:flex; flex-direction:column; gap:8px}
+.cliente{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 14px; border:1px solid var(--line); border-radius:16px; background:var(--card); cursor:pointer; text-align:left; color:inherit; width:100%; font-size:14px}
+.cliente.sel{border-color:var(--accent)}
+.cliente .quien{min-width:0} .cliente .quien strong{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cliente .der{display:flex; gap:6px; align-items:center; flex-shrink:0}
+.dos{display:grid; grid-template-columns:minmax(0,1fr); gap:16px}
+@media (min-width:860px){ .dos{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)} .dos > .lado{position:sticky; top:76px; align-self:start} }
+.historial{font-size:13px; margin:0; padding-left:18px} .historial li{margin:3px 0}
+
+.mensaje{border:1px solid var(--line); border-radius:18px; padding:14px; background:var(--card)}
+.mensaje .cab{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px}
+.mensaje .texto{white-space:pre-wrap; margin:0 0 10px}
+.mensaje .respondido{background:var(--mint-soft); border-radius:12px; padding:10px 12px; white-space:pre-wrap; margin-bottom:10px; font-size:14px}
+.mensaje textarea{margin-bottom:8px}
+
+.chat{display:flex; flex-direction:column; gap:8px; max-height:55vh; overflow-y:auto; padding:4px 2px 10px}
+.burbuja{max-width:80%; padding:9px 13px; border-radius:16px; white-space:pre-wrap; font-size:14px}
+.burbuja.cliente{background:var(--paper); border:1px solid var(--line); align-self:flex-start; border-bottom-left-radius:4px}
+.burbuja.admin{background:var(--accent-soft); align-self:flex-end; border-bottom-right-radius:4px}
+.burbuja small{display:block; color:var(--muted); font-size:11px; margin-top:3px}
+.vacio{color:var(--muted); text-align:center; padding:24px 8px}
+</style>
+</head>
+<body>
+<div id="pantallaAcceso" class="acceso" hidden>
+  <div class="card">
+    <h1>🌸 Gestión de clientes</h1>
+    <p class="meta">Entra con tu cuenta de la app de finanzas.</p>
+    <form id="fAcceso">
+      <div><label for="accEmail">Email</label><input id="accEmail" type="email" autocomplete="email" required></div>
+      <div><label for="accPass">Contraseña</label><input id="accPass" type="password" autocomplete="current-password" required></div>
+      <button class="btn" type="submit">Entrar</button>
+      <div id="accesoMsg"></div>
+    </form>
+  </div>
+</div>
+<div id="pantallaApp" hidden>
+  <div class="cabecera">
+    <h1>🌸 Gestión</h1>
+    <div class="fila-btns"><span class="meta" id="quien"></span><button class="btn linea peq" id="btnRecargar">Actualizar</button><button class="btn linea peq" id="btnSalir">Salir</button></div>
+  </div>
+  <nav class="pestanas" id="pestanas"></nav>
+  <main><div id="err"></div><div id="contenido"></div></main>
+</div>
+<script src="gestion.js"></script>
+</body>
+</html>
