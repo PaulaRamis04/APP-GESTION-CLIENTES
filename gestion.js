@@ -14,7 +14,11 @@ let session = null;
 let clientes = [], buzon = [], mensajes = [], historial = {};
 let pestana = "resumen", busqueda = "", filtroCliente = "todos", clienteSel = null, chatSel = null;
 let filtroTipo = "todos", filtroEstado = "pendientes";
-const borradores = {}; // textos a medio escribir, por id de caja
+let borradores = {}; // textos a medio escribir, por id de caja
+// Bandeja de salida: respuestas que se intentaron enviar y fallaron. «Enviar y recibir» las reintenta.
+// Cada una: {tipo:"chat"|"buzon", id, texto, caja}
+let pendientes = [];
+let ultimaRecepcion = null;
 
 // ── Utilidades ──
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -69,7 +73,20 @@ async function cargarHistorial(userId){
   const {data, error} = await sb.from("suscripciones_historial").select("*").eq("user_id", userId).order("hecho_en", {ascending:false}).limit(20);
   if(!error){ historial[userId] = data || []; render(); }
 }
-async function recargarYPintar(){ if(await cargar()) render(); }
+async function recargarYPintar(){ if(await cargar()){ ultimaRecepcion = new Date(); render(); } }
+
+// Borradores y pendientes se guardan en este navegador, para no perder nada si se recarga la página.
+const claveLocal = ()=>"gestion-borradores-"+(session?.user?.id || "");
+function guardarLocal(){
+  try{ localStorage.setItem(claveLocal(), JSON.stringify({borradores, pendientes})); }catch(e){}
+}
+function leerLocal(){
+  try{
+    const d = JSON.parse(localStorage.getItem(claveLocal()) || "{}");
+    borradores = d.borradores || {}; pendientes = d.pendientes || [];
+  }catch(e){ borradores = {}; pendientes = []; }
+}
+function borrarLocal(){ try{ localStorage.removeItem(claveLocal()); }catch(e){} }
 
 // ── Pintar ──
 function render(){
@@ -77,10 +94,30 @@ function render(){
     const n = k==="asesoria" ? mensajes.filter(m=>m.autor==="cliente" && !m.leido).length : k==="buzon" ? buzonPendiente().filter(f=>f.estado==="nuevo").length : 0;
     return `<button class="pestana ${k===pestana?"activa":""}" data-pestana="${k}">${t}${n ? `<span class="punto">${n}</span>` : ""}</button>`;
   }).join("");
+  pintarBotonEnviarRecibir();
   const c = document.getElementById("contenido");
-  c.innerHTML = pestana==="clientes" ? pintarClientes() : pestana==="asesoria" ? pintarAsesoria() : pestana==="buzon" ? pintarBuzon() : pintarResumen();
+  c.innerHTML = pintarSalida() + (pestana==="clientes" ? pintarClientes() : pestana==="asesoria" ? pintarAsesoria() : pestana==="buzon" ? pintarBuzon() : pintarResumen());
   const chat = document.querySelector(".chat");
   if(chat) chat.scrollTop = chat.scrollHeight;
+}
+
+function pintarBotonEnviarRecibir(){
+  const b = document.getElementById("btnEnviarRecibir");
+  b.innerHTML = `Enviar y recibir${pendientes.length ? ` <span class="punto">${pendientes.length}</span>` : ""}`;
+  document.getElementById("ultimaRecepcion").textContent = ultimaRecepcion ? "Recibido a las "+ultimaRecepcion.toLocaleTimeString("es-ES", {hour:"2-digit", minute:"2-digit"}) : "";
+}
+
+function pintarSalida(){
+  if(!pendientes.length) return "";
+  const destino = p=>p.tipo==="chat" ? `Asesoría · ${esc(nombreDe(clientePorId(p.id)))}` : `Buzón · respuesta`;
+  return `<div class="card salida">
+    <h2>Pendientes de enviar (${pendientes.length})</h2>
+    <p class="meta">No se pudieron enviar. Pulsa «Enviar y recibir» para volver a intentarlo.</p>
+    <div class="lista">${pendientes.map((p, i)=>`<div class="pendiente">
+      <div><strong>${destino(p)}</strong><p class="texto">${esc(p.texto)}</p></div>
+      <button class="btn linea peq" data-descartar="${i}" title="Vuelve a la caja de texto para editarlo">Editar</button>
+    </div>`).join("")}</div>
+  </div>`;
 }
 
 function pintarResumen(){
@@ -188,7 +225,7 @@ function pintarChat(id){
   const c = clientePorId(id), ms = mensajesDe(id), caja = "chat-"+id;
   return `<div class="card">
     <h2>${esc(nombreDe(c))}</h2>
-    <div class="chat">${ms.length ? ms.map(m=>`<div class="burbuja ${m.autor}">${esc(m.texto)}<small>${fechaHora(m.creado_en)}${m.autor==="admin" ? (m.leido ? " · Leído" : " · Enviado") : ""}</small></div>`).join("") : `<div class="vacio">Escribe el primer mensaje para empezar la asesoría.</div>`}</div>
+    <div class="chat">${ms.length ? ms.map(m=>`<div class="burbuja ${m.autor}">${esc(m.texto)}<small>${fechaHora(m.creado_en)}${m.autor==="admin" ? (m.leido ? " · Leído" : " · Enviado") : ""}</small></div>`).join("") : `<div class="vacio">Escribe el primer mensaje para empezar la asesoría.</div>`}${pendientes.filter(p=>p.tipo==="chat" && p.id===id).map(p=>`<div class="burbuja admin pendiente-envio">${esc(p.texto)}<small>Pendiente de enviar</small></div>`).join("")}</div>
     <textarea id="${esc(caja)}" data-borrador="${esc(caja)}" rows="3" maxlength="4000" placeholder="Escribe tu respuesta…">${esc(borradores[caja]||"")}</textarea>
     <div class="fila-btns" style="margin-top:8px"><button class="btn" data-enviar-chat="${esc(id)}">Enviar</button></div>
   </div>`;
@@ -272,21 +309,52 @@ async function borrarCliente(id){
   mostrarError("");
   await recargarYPintar();
 }
-async function enviarChat(id){
-  const caja = "chat-"+id, texto = (document.getElementById(caja)?.value || "").trim();
-  if(!texto){ mostrarError("Escribe un mensaje antes de enviarlo."); return; }
-  const {error} = await sb.from("asesoria_mensajes").insert({user_id:id, autor:"admin", texto});
-  if(error) throw new Error("No se pudo enviar: "+error.message);
-  delete borradores[caja]; mostrarError("");
+// Envía una respuesta a Supabase. Devuelve el error (o null si ha ido bien).
+async function mandar(p){
+  try{
+    const {error} = p.tipo==="chat"
+      ? await sb.from("asesoria_mensajes").insert({user_id:p.id, autor:"admin", texto:p.texto})
+      : await sb.from("comunidad").update({respuesta:p.texto, respondido_en:new Date().toISOString(), estado:"resuelto"}).eq("id", p.id);
+    return error;
+  }catch(e){ return e; }
+}
+// Intenta enviar; si falla, la respuesta pasa a la bandeja de salida en vez de perderse.
+async function enviarRespuesta(tipo, id){
+  const caja = (tipo==="chat" ? "chat-" : "resp-")+id, texto = (document.getElementById(caja)?.value || "").trim();
+  if(!texto){ mostrarError(tipo==="chat" ? "Escribe un mensaje antes de enviarlo." : "Escribe la respuesta antes de enviarla."); return; }
+  const p = {tipo, id, texto, caja};
+  delete borradores[caja];
+  const error = await mandar(p);
+  if(error){
+    pendientes.push(p); guardarLocal(); render();
+    throw new Error("No se pudo enviar ("+(error.message || error)+"). Queda en «Pendientes de enviar».");
+  }
+  guardarLocal(); mostrarError("");
   await recargarYPintar();
 }
-async function responder(id){
-  const caja = "resp-"+id, texto = (document.getElementById(caja)?.value || "").trim();
-  if(!texto){ mostrarError("Escribe la respuesta antes de enviarla."); return; }
-  const {error} = await sb.from("comunidad").update({respuesta:texto, respondido_en:new Date().toISOString(), estado:"resuelto"}).eq("id", id);
-  if(error) throw new Error("No se pudo guardar la respuesta: "+error.message);
-  delete borradores[caja]; mostrarError("");
+// Botón «Enviar y recibir»: primero manda lo pendiente y luego trae lo nuevo.
+async function enviarYRecibir(){
+  const fallos = [];
+  for(const p of [...pendientes]){
+    const error = await mandar(p);
+    if(error) fallos.push(error.message || String(error));
+    else pendientes = pendientes.filter(x=>x!==p);
+  }
+  guardarLocal();
   await recargarYPintar();
+  if(fallos.length) mostrarError(`${fallos.length===1 ? "1 mensaje sigue" : fallos.length+" mensajes siguen"} sin enviarse: ${fallos[0]}`);
+  else render();
+}
+// Saca un pendiente de la bandeja y lo devuelve a su caja de texto para editarlo.
+function descartarPendiente(i){
+  const p = pendientes[i]; if(!p) return;
+  pendientes.splice(i, 1);
+  borradores[p.caja] = borradores[p.caja] ? borradores[p.caja]+"\n"+p.texto : p.texto;
+  guardarLocal();
+  if(p.tipo==="chat"){ chatSel = p.id; pestana = "asesoria"; }
+  else { pestana = "buzon"; filtroEstado = "todos"; filtroTipo = "todos"; }
+  render();
+  const t = document.getElementById(p.caja); if(t){ t.focus(); t.scrollIntoView({block:"center"}); }
 }
 async function cambiarEstado(id, estado){
   const {error} = await sb.from("comunidad").update({estado}).eq("id", id);
@@ -306,7 +374,7 @@ function wire(){
       const pos = e.target.selectionStart; render();
       const b = document.getElementById("busqueda"); b.focus(); b.setSelectionRange(pos, pos);
     }
-    if(e.target.dataset.borrador) borradores[e.target.dataset.borrador] = e.target.value;
+    if(e.target.dataset.borrador){ borradores[e.target.dataset.borrador] = e.target.value; guardarLocal(); }
   });
   cont.addEventListener("click", e=>{
     const t = e.target.closest("button"); if(!t) return;
@@ -318,17 +386,21 @@ function wire(){
     else if(d.cliente) elegirCliente(d.cliente);
     else if(d.abrirChat) abrirChat(d.abrirChat);
     else if(d.guardarPlan) conCarga(t, ()=>guardarPlan(d.guardarPlan));
-    else if(d.enviarChat) conCarga(t, ()=>enviarChat(d.enviarChat));
-    else if(d.responder) conCarga(t, ()=>responder(d.responder));
+    else if(d.enviarChat) conCarga(t, ()=>enviarRespuesta("chat", d.enviarChat));
+    else if(d.responder) conCarga(t, ()=>enviarRespuesta("buzon", d.responder));
+    else if(d.descartar) descartarPendiente(Number(d.descartar));
     else if(d.estado) conCarga(t, ()=>cambiarEstado(d.estado, d.valor));
     else if(d.borrarCliente) conCarga(t, ()=>borrarCliente(d.borrarCliente));
     else if(d.activar) conCarga(t, ()=>activarPlan(d.activar, d.plan, d.importe));
   });
-  document.getElementById("btnRecargar").onclick = e=>conCarga(e.currentTarget, recargarYPintar);
+  document.getElementById("btnEnviarRecibir").onclick = e=>conCarga(e.currentTarget, enviarYRecibir);
   // Pide confirmación y recarga la página al salir para no dejar datos de clientes en memoria.
+  // Al salir se borran también los borradores y pendientes guardados en este navegador.
   document.getElementById("btnSalir").onclick = async e=>{
-    if(!confirm("¿Cerrar sesión?")) return;
+    const sinEnviar = pendientes.length + Object.values(borradores).filter(t=>t.trim()).length;
+    if(!confirm(sinEnviar ? `Tienes ${sinEnviar} ${sinEnviar===1 ? "texto" : "textos"} sin enviar que se perderán. ¿Cerrar sesión?` : "¿Cerrar sesión?")) return;
     e.currentTarget.disabled = true;
+    borrarLocal();
     await sb.auth.signOut();
     location.reload();
   };
@@ -338,13 +410,7 @@ function wire(){
     const {error} = await sb.auth.signInWithPassword({email:document.getElementById("accEmail").value.trim(), password:document.getElementById("accPass").value});
     if(error) msg.textContent = /invalid login/i.test(error.message) ? "Email o contraseña incorrectos." : error.message;
   };
-  // Refresco suave cada minuto, sin interrumpir si se está escribiendo.
-  setInterval(async ()=>{
-    if(!session || document.visibilityState!=="visible") return;
-    const ae = document.activeElement;
-    if(ae && ["INPUT","TEXTAREA","SELECT"].includes(ae.tagName)) return;
-    await recargarYPintar();
-  }, 60000);
+  // Sin refresco automático: los mensajes nuevos llegan al pulsar «Enviar y recibir».
 }
 
 async function entrar(s){
@@ -353,6 +419,7 @@ async function entrar(s){
   document.getElementById("pantallaApp").hidden = !s;
   if(!s) return;
   document.getElementById("quien").textContent = s.user.email;
+  leerLocal();
   const {data:esAdmin, error} = await sb.rpc("es_admin");
   if(error || esAdmin!==true){
     document.getElementById("pestanas").innerHTML = "";
