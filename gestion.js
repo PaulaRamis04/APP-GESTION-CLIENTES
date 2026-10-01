@@ -39,6 +39,8 @@ function planDe(c){
   if(c.plan && c.activa) return "vencido";
   return "gratis";
 }
+// Minúsculas y sin tildes, para que "perez" encuentre a "Pérez"
+function sinTildes(s){ return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
 function nombreDe(c){ return c ? (c.nombre || c.email || "Sin nombre") : "Usuario borrado"; }
 const clientePorId = id=>clientes.find(c=>c.user_id===id);
 const mensajesDe = id=>mensajes.filter(m=>m.user_id===id);
@@ -111,12 +113,12 @@ function filaCliente(c){
 }
 
 function pintarClientes(){
-  const q = busqueda.trim().toLowerCase();
+  const q = sinTildes(busqueda.trim());
   const lista = clientes.filter(c=>{
     const p = planDe(c);
     if(filtroCliente==="premium" && !["premium","asesoria"].includes(p)) return false;
     if(!["todos","premium"].includes(filtroCliente) && p!==filtroCliente) return false;
-    return !q || (c.email||"").toLowerCase().includes(q) || (c.nombre||"").toLowerCase().includes(q);
+    return !q || sinTildes(c.email).includes(q) || sinTildes(c.nombre).includes(q);
   });
   const chips = [["todos","Todos"],["gratis","Gratis"],["premium","Premium"],["asesoria","Con asesoría"],["vencido","Vencidos"]];
   return `<div class="dos">
