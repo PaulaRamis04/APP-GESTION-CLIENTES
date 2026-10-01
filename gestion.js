@@ -237,9 +237,12 @@ function pintarMensajeBuzon(f){
   const info = f.info ? `<p class="meta">${esc(Object.entries(f.info).map(([k,v])=>`${k}: ${v}`).join(" · "))}</p>` : "";
   const c = clientePorId(f.user_id);
   const planSugerido = Number(f.importe)>=5 ? "asesoria" : "premium";
+  // Si ya es supporter, la petición es un cambio de aportación (subir o bajar).
+  const planActual = c ? planDe(c) : null, esCambio = planActual==="premium" || planActual==="asesoria";
+  const pierdeAsesoria = planActual==="asesoria" && planSugerido==="premium";
   return `<div class="mensaje">
     <div class="cab">${marca(f.tipo, TIPOS_BUZON[f.tipo]||f.tipo)} ${marca(estado, ESTADOS_BUZON[estado]||estado)} <strong>${quien}</strong> <span class="meta">${fechaHora(creado(f))}</span></div>
-    ${f.tipo==="supporter" ? `<p class="texto"><strong>Quiere aportar ${esc(f.importe)} €/mes.</strong>${c ? ` Ahora tiene: ${PLANES[planDe(c)]}.` : ""}</p>` : ""}
+    ${f.tipo==="supporter" ? `<p class="texto"><strong>${esCambio ? `Quiere cambiar su aportación a ${esc(f.importe)} €/mes.` : `Quiere aportar ${esc(f.importe)} €/mes.`}</strong>${c ? ` Ahora tiene: ${PLANES[planActual]}${esCambio && c.importe!=null ? ` (${esc(c.importe)} €/mes)` : ""}.` : ""}${pierdeAsesoria ? " Con menos de 5 € pasaría a Premium sin asesoría." : ""}</p>` : ""}
     ${f.texto ? `<p class="texto">${esc(f.texto)}</p>` : ""}
     ${info}
     ${f.respuesta ? `<div class="respondido"><strong>Tu respuesta${f.respondido_en ? ` (${fechaHora(f.respondido_en)})` : ""}:</strong>\n${esc(f.respuesta)}</div>` : ""}
@@ -248,7 +251,7 @@ function pintarMensajeBuzon(f){
       <button class="btn peq" data-responder="${esc(f.id)}">Responder y resolver</button>
       ${estado!=="en_curso" ? `<button class="btn linea peq" data-estado="${esc(f.id)}" data-valor="en_curso">En curso</button>` : ""}
       ${estado!=="resuelto" ? `<button class="btn linea peq" data-estado="${esc(f.id)}" data-valor="resuelto">Resolver sin responder</button>` : `<button class="btn linea peq" data-estado="${esc(f.id)}" data-valor="nuevo">Reabrir</button>`}
-      ${f.tipo==="supporter" && c ? `<button class="btn suave peq" data-activar="${esc(f.user_id)}" data-plan="${planSugerido}" data-importe="${esc(f.importe ?? "")}">Activar ${PLANES[planSugerido]}</button>` : ""}
+      ${f.tipo==="supporter" && c ? `<button class="btn suave peq" data-activar="${esc(f.user_id)}" data-plan="${planSugerido}" data-importe="${esc(f.importe ?? "")}">${esCambio ? `Aplicar ${esc(f.importe)} €/mes${planSugerido!==planActual ? ` (${PLANES[planSugerido]})` : ""}` : `Activar ${PLANES[planSugerido]}`}</button>` : ""}
       ${f.email ? `<a class="btn linea peq" href="mailto:${esc(f.email)}">Email</a>` : ""}
       ${f.user_id && pestana!=="clientes" ? `<button class="btn linea peq" data-cliente="${esc(f.user_id)}" data-ir-ficha="1">Ver ficha</button>` : ""}
     </div>
@@ -291,8 +294,10 @@ async function guardarPlan(id){
 }
 async function activarPlan(id, plan, importe){
   const c = clientePorId(id);
-  if(!confirm(`¿Activar ${PLANES[plan]} a ${nombreDe(c)}?`)) return;
-  const {error} = await sb.rpc("admin_set_suscripcion", {p_user:id, p_plan:plan, p_hasta:null, p_importe:importe==="" ? null : Number(importe), p_nota:c?.nota || null});
+  // Un cambio de aportación conserva la fecha de fin que ya tuviera.
+  const esCambio = c && (planDe(c)==="premium" || planDe(c)==="asesoria");
+  if(!confirm(esCambio ? `¿Cambiar la aportación de ${nombreDe(c)} a ${importe} €/mes (${PLANES[plan]})?` : `¿Activar ${PLANES[plan]} a ${nombreDe(c)}?`)) return;
+  const {error} = await sb.rpc("admin_set_suscripcion", {p_user:id, p_plan:plan, p_hasta:esCambio ? (c.hasta || null) : null, p_importe:importe==="" ? null : Number(importe), p_nota:c?.nota || null});
   if(error) throw new Error("No se pudo activar: "+error.message);
   delete historial[id];
   await recargarYPintar();
