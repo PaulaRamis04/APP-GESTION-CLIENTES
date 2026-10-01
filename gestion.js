@@ -323,7 +323,13 @@ function wire(){
     else if(d.activar) conCarga(t, ()=>activarPlan(d.activar, d.plan, d.importe));
   });
   document.getElementById("btnRecargar").onclick = e=>conCarga(e.currentTarget, recargarYPintar);
-  document.getElementById("btnSalir").onclick = ()=>sb.auth.signOut();
+  // Pide confirmación y recarga la página al salir para no dejar datos de clientes en memoria.
+  document.getElementById("btnSalir").onclick = async e=>{
+    if(!confirm("¿Cerrar sesión?")) return;
+    e.currentTarget.disabled = true;
+    await sb.auth.signOut();
+    location.reload();
+  };
   document.getElementById("fAcceso").onsubmit = async e=>{
     e.preventDefault();
     const msg = document.getElementById("accesoMsg"); msg.textContent = "";

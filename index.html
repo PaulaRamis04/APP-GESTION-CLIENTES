@@ -40,6 +40,8 @@ textarea{resize:vertical}
 .btn:hover{background:var(--accent-2)} .btn:disabled{opacity:.6; cursor:default}
 .btn.suave{background:var(--accent-soft); color:var(--accent)}
 .btn.linea{background:transparent; color:var(--ink); border:1.5px solid var(--line)}
+.btn-texto{background:none; border:none; padding:7px 4px; margin-left:14px; color:var(--muted); font-size:12.5px; font-family:inherit; text-decoration:underline; cursor:pointer}
+.btn-texto:hover{color:var(--neg)} .btn-texto:disabled{opacity:.6; cursor:default}
 .btn.peligro{background:var(--neg); color:var(--on-accent)} .btn.peligro:hover{filter:brightness(.95)}
 .btn.peq{padding:7px 13px; font-size:12.5px}
 .fila-btns{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
@@ -112,7 +114,7 @@ main{max-width:1100px; margin:0 auto; padding:16px}
 <div id="pantallaApp" hidden>
   <div class="cabecera">
     <h1>🌸 Gestión</h1>
-    <div class="fila-btns"><span class="meta" id="quien"></span><button class="btn linea peq" id="btnRecargar">Actualizar</button><button class="btn linea peq" id="btnSalir">Salir</button></div>
+    <div class="fila-btns"><span class="meta" id="quien"></span><button class="btn linea peq" id="btnRecargar">Actualizar</button><button class="btn-texto" id="btnSalir">Cerrar sesión</button></div>
   </div>
   <nav class="pestanas" id="pestanas"></nav>
   <main><div id="err"></div><div id="contenido"></div></main>
